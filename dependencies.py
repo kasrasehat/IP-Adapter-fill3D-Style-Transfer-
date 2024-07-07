@@ -83,7 +83,7 @@ class SegmentationClient:
         self,
         segmentation_api_url,
         temp_bucket_name,
-        env: str = "DEV",
+        env: str = "LOCAL",
     ):
         self.segmentation_api_url = segmentation_api_url
         self.temp_bucket_name = temp_bucket_name

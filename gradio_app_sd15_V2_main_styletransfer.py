@@ -1,4 +1,5 @@
 from diffusers import StableDiffusionControlNetInpaintPipeline, ControlNetModel, DDIMScheduler, AutoencoderKL, UniPCMultistepScheduler
+from gradio_imageslider import ImageSlider
 from diffusers.utils import load_image
 import numpy as np
 import torch
@@ -54,8 +55,8 @@ def resize_image_with_height(pil_image, new_height):
     aspect_ratio = width / height
 
     # Calculate the new width based on the aspect ratio
-    new_width = int(new_height * aspect_ratio)
-
+    new_width = int(new_height * aspect_ratio) 
+    new_width = new_width - new_width % 8
     # Resize the image while preserving the aspect ratio
     resized_image = pil_image.resize((new_width, new_height))
 
@@ -375,6 +376,8 @@ class Generator:
         if sampler_type == "UniPCMultistepScheduler":
             self.pipe.scheduler = UniPCMultistepScheduler.from_config(self.pipe.scheduler.config)
         elif sampler_type == "DPMSolverMultistepScheduler":
+            self.pipe.scheduler.config['use_karras_sigmas'] = True
+            self.pipe.scheduler.config['algorithm_type'] = "sde-dpmsolver++"
             self.pipe.scheduler = DPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config)
         elif sampler_type == "DEISMultistepScheduler":
             self.pipe.scheduler = DEISMultistepScheduler.from_config(self.pipe.scheduler.config)
@@ -425,6 +428,7 @@ class Generator:
                                         control_guidance_end=control_guidance_end,
                                         guidance_scale=guidance,
                                         )
+                image_1 = self.pipe.image_processor.apply_overlay(mask, init_image, images[0])
             else:
                 images = self.ip_model.generate(pil_image=reference_image,
                                                 negative_prompt='worst quality, normal quality, low quality, low res, blurry, text, watermark, logo, banner, extra digits, cropped, jpeg artifacts, signature, username, error, sketch ,duplicate, ugly, monochrome, horror, geometry, mutation, disgusting',
@@ -448,8 +452,9 @@ class Generator:
                                                 control_guidance_end=control_guidance_end,
                                                 guidance_scale=guidance,
                                                 )
+                image_1 = self.pipe.image_processor.apply_overlay(mask, init_image, images[0])
         image = images[0].resize(init_image.size)
-        return image
+        return (image, image_1)
 
 
 def get_demo(generate_handler, segment_handler):
@@ -498,7 +503,10 @@ def get_demo(generate_handler, segment_handler):
                 )
                 
             with gr.Column():
-                output_image = gr.Image(type="pil", format='jpg', interactive=False)
+                img_slider = ImageSlider(label="Blur image", type="pil", slider_color="pink")
+                # img_slider.upload(fn, inputs=img1, outputs=img1)
+                # output_image = gr.Image(type="pil", format='jpg', interactive=False)
+                
                 # auto_fill_button = gr.Button("Auto Fill Prompt", size="sm")
                 # negative_prompt = gr.Textbox(
                 #     "Low quality, bad quality, blur, blurry, sketches, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime",
@@ -691,7 +699,7 @@ def get_demo(generate_handler, segment_handler):
                 sampler_type,
                 resolution_mode,
             ],
-            output_image,
+            img_slider,
         )
     return demo
 
@@ -756,5 +764,5 @@ if __name__ == "__main__":
     demo = get_demo(generate_handler, segment_handler)
     demo.launch(
         server_name="0.0.0.0",
-        server_port=8900,
+        server_port=8400,
     )
