@@ -108,7 +108,7 @@ class SegmentHandler:
     def __call__(
         self,
         image_edit_data: dict,
-        service_type: Literal["Wall", "Floor", "Ceiling", "Furniture"],
+        service_type: Literal["Wall", "Floor", "Ceiling", "Furniture", 'Countertop', 'Sky'],
     ):
         image = image_edit_data["background"]
         layer_1 = image_edit_data["layers"][0]
@@ -472,9 +472,9 @@ def get_demo(generate_handler, segment_handler):
                 # mask_image = gr.Image(type="pil", label="Mask Image")
                 reference_image = gr.Image(type="pil", label="Reference Image")
                 object_type = gr.Dropdown(
-                    ["Wall", "Floor", "Ceiling", "Furniture", 'Countertop', 'Backsplash'],
+                    ["Wall", "Floor", "Ceiling", "Furniture", 'Countertop', 'Sky'],
                     label="Segmented object type",
-                    value="Floor",
+                    value="Sky",
                     interactive=True,
                 )
                 # mask_expand = gr.Slider(
@@ -499,6 +499,7 @@ def get_demo(generate_handler, segment_handler):
                 style_type = gr.Dropdown(
                     ["only_style", "whole_room"],
                     label="Style type",
+                    value="only_style",
                     interactive=True,
                 )
                 
