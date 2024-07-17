@@ -56,7 +56,7 @@ def resize_image_with_height(pil_image, new_height):
 
     # Calculate the new width based on the aspect ratio
     new_width = int(new_height * aspect_ratio)
-
+    new_width = new_width - new_width % 8
     # Resize the image while preserving the aspect ratio
     resized_image = pil_image.resize((new_width, new_height))
 
@@ -215,7 +215,8 @@ class Generator:
         # self.pipe.unet = register_cross_attention_hook(self.pipe.unet)
         # self.ip_model = IPAdapterPlus(self.pipe, image_encoder_path, ip_ckpt, device="cuda", num_tokens=16)
         # self.ip_model = IPAdapter(self.pipe, image_encoder_path, ip_ckpt, device="cuda")
-
+    
+    
     def canny_image(self, image):
         
         image1 = np.array(image)
@@ -329,6 +330,62 @@ class Generator:
         return final_im
     
 
+    def resize_mask_area(self, mask, scale):
+        """
+        Resize the non-black area of the mask while maintaining its shape and aspect ratio.
+
+        Parameters:
+        mask (numpy.ndarray): The input mask to resize.
+        percentage (float): The percentage to resize the mask area (e.g., 50 for 50%).
+
+        Returns:
+        numpy.ndarray: The mask with resized non-black area.
+        """
+        # Convert numpy mask to PIL image
+        mask_pil = mask
+        
+        # Find the bounding box of the non-black area
+        bbox = mask_pil.getbbox()
+        x, y, w, h = bbox
+        x0, y0, x1, y1 = bbox
+        w = x1 - x0
+        h = y1 - y0
+        
+
+        #     # Draw the bounding box on the mask_pil image
+        # draw = ImageDraw.Draw(mask_pil)
+        # draw.rectangle(bbox, outline=255, width=2)
+        # Extract the non-black area
+        mask_area = mask_pil.crop(bbox)
+        
+        # Calculate the new size
+        new_width = int(mask_area.width * scale)
+        new_height = int(mask_area.height * scale)
+        new_height = new_height - new_height % 8
+        new_width = new_width - new_width % 8
+        
+        # Resize the non-black area
+        resized_area = mask_area.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        # Create a new mask with the same shape as the original
+        new_mask_pil = Image.new('RGB', mask_pil.size)
+        
+        # Calculate the new top-left corner position to place the resized area back
+        new_x = x0 + (w - new_width) // 2
+        new_y = y0 + (h - new_height) // 2
+        
+        # Ensure the new position is within the mask bounds
+        new_x = max(0, new_x)
+        new_y = max(0, new_y)
+        new_x_end = min(mask_pil.width, new_x + new_width)
+        new_y_end = min(mask_pil.height, new_y + new_height)
+        
+        # Place the resized area back into the new mask
+        new_mask_pil.paste(resized_area, (new_x, new_y, new_x_end, new_y_end))
+        
+        return new_mask_pil
+
+
     def __call__(
             self,
             positive_prompt,
@@ -356,6 +413,7 @@ class Generator:
             sampler_type,
             resolution_mode,
             generation_mode,
+            mask_scale,
             ):
         
         init_image['background'] = resize_image_with_height(init_image['background'], resolution[resolution_mode]).convert('RGB')
@@ -377,9 +435,9 @@ class Generator:
         init_image = grayscale_init_img
         init_img = init_image
         mask = mask_image.resize(main_image.size, Image.Resampling.LANCZOS)
+        mask = self.resize_mask_area(mask, mask_scale)
         unblurred_mask = self.pipe.mask_processor.blur(mask, blur_factor=2)
-        mask = self.pipe.mask_processor.blur(mask, blur_factor=5)
-        
+        mask = self.pipe.mask_processor.blur(mask, blur_factor=3)
         fff = np.array(main_image)
         fff[np.array(mask)>150] = 250
         fff = Image.fromarray(fff)
@@ -560,6 +618,15 @@ def get_demo(generate_handler):
                 #     label="Negative Prompt",
                 #     interactive=True,
                 # )
+                mask_scale = gr.Slider(
+                    minimum=0.3,
+                    maximum=2,
+                    value=1,
+                    label="Mask scale",
+                    interactive=True,
+                    step=0.05,
+                )
+                
                 brightness = gr.Slider(
                     minimum=0.5,
                     maximum=2,
@@ -753,6 +820,7 @@ def get_demo(generate_handler):
                 sampler_type,
                 resolution_mode,
                 generation_mode,
+                mask_scale
             ],
             output_image,
         )
@@ -821,6 +889,6 @@ if __name__ == "__main__":
     # segment_handler = SegmentHandler(segmentation_client)
     demo = get_demo(generate_handler)
     demo.launch(
-        server_name="0.0.0.0",
-        server_port=8200,
+        server_name="127.0.0.1",
+        server_port=8300,
     )
