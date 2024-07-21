@@ -224,7 +224,7 @@ def hash_image(image: Image.Image) -> str:
     return sha256(image_bytes).hexdigest()
 
 
-def resize_mask_area(self, mask, scale):
+def resize_mask_area(mask, scale):
         """
         Resize the non-black area of the mask while maintaining its shape and aspect ratio.
 

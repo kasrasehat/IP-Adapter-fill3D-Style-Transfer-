@@ -120,6 +120,7 @@ def setup_minio(args):
     return min_client
 
 def runner(
+            params,
             image_name,
             mask_name,
             beforebucket,
@@ -129,7 +130,8 @@ def runner(
             prompt,
             res_mode,
             debug_mode,
-            client
+            client,
+            
            ):
     
     timestamp = datetime.now().strftime("[%Y-%m-%d--%H-%M-%S]")
@@ -159,7 +161,7 @@ def runner(
     logging.info(f"\tmask shape: {mask_image.size}")
 
     mask_image = np.array(mask_image)
-    mask_image = np.where(mask_image==[120,120,205], [255,255,255], [0,0,0]) * 255
+    mask_image = np.where(mask_image==[120,120,205], [255,255,255], [0,0,0])
     mask_image = Image.fromarray(mask_image.astype(np.uint8)).convert("L").convert('RGB')
     image = resize_image_with_height(image, resolution[res_mode])
     main_image = image
@@ -284,16 +286,17 @@ async def compute_ip(image_name: str = '',
             reader = csv.DictReader(file)
             params = get_row_by_name(reader, prompt)
 
-
+        
+        params = params
         args.miniosecure = bool(os.getenv(f'{env}_MINIO_SECURE'))
         args.miniouser = os.getenv(f'{env}_MINIO_ACCESS_KEY')
         args.miniopass = os.getenv(f'{env}_MINIO_SECRET_KEY')
         args.minioserver = os.getenv(f'{env}_MINIO_ADDRESS')
 
-        # args.minioserver = "192.168.32.33:9000"
-        # args.miniouser = "test_user_chohfahe7e"
-        # args.miniopass = "ox2ahheevahfaicein5rooyahze4Zeidung3aita6iaNahXu"
-        # args.miniosecure = False       
+        args.minioserver = "192.168.32.33:9000"
+        args.miniouser = "test_user_chohfahe7e"
+        args.miniopass = "ox2ahheevahfaicein5rooyahze4Zeidung3aita6iaNahXu"
+        args.miniosecure = False       
 
         client = setup_minio(args)
 
@@ -306,6 +309,7 @@ async def compute_ip(image_name: str = '',
         response = await loop.run_in_executor(
             None,
             runner,
+            params,
             image_name,
             mask_name,
             beforebucket,
@@ -374,8 +378,11 @@ if __name__ == "__main__":
 
     global pipe, mlsd_preprocessor, normal_processor, controlnet_canny, env_vars
     pipe = prepare_model_from_diffusers_controlnet(args, logging)
+    # mlsd_preprocessor = MLSDdetector.from_pretrained("lllyasviel/ControlNet")
+    # normal_processor = ControlNetModel.from_pretrained("lllyasviel/control_v11p_sd15_normalbae")
+    # controlnet_canny = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny")
     mlsd_preprocessor = MLSDdetector.from_pretrained("lllyasviel/ControlNet")
-    normal_processor = ControlNetModel.from_pretrained("lllyasviel/control_v11p_sd15_normalbae")
+    normal_processor = NormalBaeDetector.from_pretrained("lllyasviel/Annotators")
     controlnet_canny = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny")
         
     env_vars = load_env_vars()
