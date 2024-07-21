@@ -5,6 +5,7 @@ import gc
 import json
 import logging
 import os
+import csv
 import uuid
 from io import BytesIO
 from time import time
@@ -81,6 +82,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def get_row_by_name(reader, name):
+    for row in reader:
+        if row["Name"] == name:
+            return row
+    return None
+
 
 def get_image(bucket_name, object_name, local_file_path, client):
     client.fget_object(bucket_name, object_name, local_file_path)
